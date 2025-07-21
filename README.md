@@ -36,6 +36,56 @@ python client.py
 
 ## Architecture
 
+### System Overview
+
+```mermaid
+graph TB
+    subgraph "uAgent Framework"
+        UA[User Agent] --> |Chat Messages| BA[Bonfire Agent]
+        BA --> |Responses| UA
+        BA --> |Search Queries| UA
+    end
+
+    subgraph "Bonfires.ai Backend"
+        BA --> |Ingest Content| IC[Ingest Content API]
+        BA --> |Search| VS[Vector Store Search]
+        BA --> |Taxonomy| TG[Taxonomy Generation]
+        
+        IC --> |Store| VDB[(Vector Database<br/>Weaviate)]
+        VS --> |Query| VDB
+        TG --> |Labels| VDB
+        
+        VDB --> |Chunks| CH[Content Chunks]
+        VDB --> |Embeddings| EM[Vector Embeddings]
+        VDB --> |Taxonomy| TX[Taxonomy Labels]
+    end
+
+    subgraph "Memory Flow"
+        UA --> |Chat Output| BA
+        BA --> |Store in Bonfire| IC
+        IC --> |Persistent Memory| VDB
+        VDB --> |Context Retrieval| VS
+        VS --> |Relevant Context| BA
+        BA --> |Enhanced Response| UA
+    end
+
+    subgraph "Query Flow"
+        UA --> |Question| BA
+        BA --> |Search Request| VS
+        VS --> |Semantic Search| VDB
+        VDB --> |Relevant Chunks| VS
+        VS --> |Search Results| BA
+        BA --> |Answer| UA
+    end
+
+    style BA fill:#e1f5fe
+    style VDB fill:#f3e5f5
+    style UA fill:#e8f5e8
+    style IC fill:#fff3e0
+    style VS fill:#fff3e0
+    style TG fill:#fff3e0
+```
+
 ### Data Flow
 1. **Ingest**: Content is ingested into a bonfire via `/ingest_content`
 2. **Process**: Taxonomy is generated and chunks are labeled
@@ -56,7 +106,7 @@ See `bonfires_api_notes.md` for detailed API documentation and investigation not
 ## TODO
 
 1. ✅ Map bonfires API calls and data structure
-2. Create an architecture diagram for the integration:
+2. ✅ Create an architecture diagram for the integration:
    - ✅ Create data store on bonfires
    - ✅ Create query flow: infer, search, reply
    - ✅ Create memory flow: chat outputs into bonfire, (mailbox processing)
@@ -68,4 +118,5 @@ See `bonfires_api_notes.md` for detailed API documentation and investigation not
 - `client.py` - Test client for the uAgent
 - `requirements.txt` - Python dependencies
 - `bonfires_api_notes.md` - API investigation notes
+- `architecture.md` - Detailed architecture documentation
 - `README.md` - This file 
