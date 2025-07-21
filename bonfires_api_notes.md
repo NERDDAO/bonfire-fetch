@@ -1,7 +1,7 @@
 # Bonfires.ai API Investigation Notes
 
 ## API Overview
-- **Base URL**: `https://tnt-v2.api.bot.fun`
+- **Base URL**: `<API-BASE-URL>`
 - **API Name**: kEngram Analysis API
 - **Version**: 2.0
 - **Description**: Lean API for purpose-driven document analysis using kEngrams

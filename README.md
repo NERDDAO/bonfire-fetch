@@ -4,7 +4,7 @@ This is an agent integration between bonfires.ai and ASI:One uAgent framework.
 
 Bonfires provides a contextual framework to process unstructured data while the uAgents bring infrastructure for distribution of knowledge and agentic frameworks.
 
-Bonfires is a semantic back end that will create taxonomies for documents and put them in vector storage. The service can ingest documents and use the chunk search to find contextual data for the agent.
+Bonfires is a semantic back end that creates taxonomies for documents and stores them in vector storage. The service can ingest documents and use chunk search to find contextual data for the agent.
 
 ## Quick Start
 
@@ -55,8 +55,8 @@ See `bonfires_api_notes.md` for detailed API documentation and investigation not
 
 ## TODO
 
-1. ✅ map bonfires api calls and data structure
-2. Create a architecture diagram for the integration:
+1. ✅ Map bonfires API calls and data structure
+2. Create an architecture diagram for the integration:
    - ✅ Create data store on bonfires
    - ✅ Create query flow: infer, search, reply
    - ✅ Create memory flow: chat outputs into bonfire, (mailbox processing)
