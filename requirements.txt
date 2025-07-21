@@ -1,0 +1,4 @@
+uagents
+uagents-core
+openai
+pydantic 
