@@ -54,17 +54,17 @@ print(f"Your agent's address is: {agent.address}")
 # Fund the agent if needed
 fund_agent_if_low(agent.wallet.address())
 
-# @protocol.on_interval(period=30.0)
-# async def health_check(ctx: Context):
-#     """Periodic health check of the bonfires API"""
-#     try:
-#         response = requests.get(f"{BONFIRES_API_BASE}/healthz")
-#         if response.status_code == 200:
-#             ctx.logger.info("Bonfires API is healthy")
-#         else:
-#             ctx.logger.warning(f"Bonfires API health check failed: {response.status_code}")
-#     except Exception as e:
-#         ctx.logger.error(f"Error checking bonfires API health: {e}")
+@protocol.on_interval(period=30.0)
+async def health_check(ctx: Context):
+    """Periodic health check of the bonfires API"""
+    try:
+        response = requests.get(f"{BONFIRES_API_BASE}/healthz")
+        if response.status_code == 200:
+            ctx.logger.info("Bonfires API is healthy")
+        else:
+            ctx.logger.warning(f"Bonfires API health check failed: {response.status_code}")
+    except Exception as e:
+        ctx.logger.error(f"Error checking bonfires API health: {e}")
 
 @protocol.on_message(model=ChatMessage)
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
@@ -111,7 +111,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             model="asi1-mini",
             messages=[
                 {"role": "system", "content": f"""
-        You are a helpful assistant who only answers questions about {subject_matter}. 
+        You are a helpful assistant who is an expert in {subject_matter}. 
         You should use the search results to answer the user's question.
                 """},
                 {"role": "assistant", "content": search_response},
