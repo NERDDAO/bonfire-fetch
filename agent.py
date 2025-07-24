@@ -37,9 +37,9 @@ client = OpenAI(
 # Create the agent
 agent = Agent(
     name="bonfire_agent",
-    port=8000,
+    port=8001,
     seed=AGENT_SEED_PHRASE,
-    endpoint=["http://127.0.0.1:8000/submit"],
+    endpoint=["http://127.0.0.1:8001/submit"],
     mailbox=True
 )
 
