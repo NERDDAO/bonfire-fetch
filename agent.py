@@ -3,108 +3,88 @@ Simple uAgent integration with bonfires.ai
 Based on ASI:One documentation examples
 """
 
-import asyncio
-from uagents import Agent, Context, Model
+from datetime import datetime
+from uuid import uuid4
+from uagents import Protocol, Agent, Context, Model
+from openai import OpenAI
 from uagents.setup import fund_agent_if_low
 from uagents import Field
+from uagents_core.contrib.protocols.chat import (
+    ChatAcknowledgement,
+    ChatMessage,
+    EndSessionContent,
+    TextContent,
+    chat_protocol_spec,
+)
 import requests
 import json
+from dotenv import load_dotenv
+import os
 
-# Define message models
-class ChatMessage(Model):
-    message: str = Field(description="The message to process")
-    bonfire_id: str = Field(default="default", description="The bonfire ID to use")
+load_dotenv()
 
-class SearchRequest(Model):
-    query: str = Field(description="The search query")
-    bonfire_id: str = Field(default="default", description="The bonfire ID to search in")
+BONFIRES_API_BASE = os.getenv("BONFIRES_ENDPOINT")
+ASI_ONE_API_KEY = os.getenv("ASI_ONE_API_KEY")
+BONFIRES_ID = os.getenv("BONFIRES_ID")
+AGENT_SEED_PHRASE = os.getenv("AGENT_SEED_PHRASE")
 
-class SearchResponse(Model):
-    results: list = Field(description="Search results")
-    query: str = Field(description="The original query")
+
+client = OpenAI(
+    base_url="https://api.as1.ai/v1",
+    api_key=ASI_ONE_API_KEY
+)
 
 # Create the agent
 agent = Agent(
     name="bonfire_agent",
     port=8000,
-    seed="bonfire_agent_seed_phrase_here",
+    seed=AGENT_SEED_PHRASE,
     endpoint=["http://127.0.0.1:8000/submit"],
+    mailbox=True
 )
+
+protocol = Protocol(spec=chat_protocol_spec)
+
+# the subject that this assistant is an expert in
+subject_matter = "organize a birthday party"
+
+# Copy the address shown below
+print(f"Your agent's address is: {agent.address}")
 
 # Fund the agent if needed
 fund_agent_if_low(agent.wallet.address())
 
-# Bonfires API configuration
-BONFIRES_API_BASE = "<BONFIRES_API_BASE>"
+# @protocol.on_interval(period=30.0)
+# async def health_check(ctx: Context):
+#     """Periodic health check of the bonfires API"""
+#     try:
+#         response = requests.get(f"{BONFIRES_API_BASE}/healthz")
+#         if response.status_code == 200:
+#             ctx.logger.info("Bonfires API is healthy")
+#         else:
+#             ctx.logger.warning(f"Bonfires API health check failed: {response.status_code}")
+#     except Exception as e:
+#         ctx.logger.error(f"Error checking bonfires API health: {e}")
 
-@agent.on_interval(period=30.0)
-async def health_check(ctx: Context):
-    """Periodic health check of the bonfires API"""
-    try:
-        response = requests.get(f"{BONFIRES_API_BASE}/healthz")
-        if response.status_code == 200:
-            ctx.logger.info("Bonfires API is healthy")
-        else:
-            ctx.logger.warning(f"Bonfires API health check failed: {response.status_code}")
-    except Exception as e:
-        ctx.logger.error(f"Error checking bonfires API health: {e}")
-
-@agent.on_message(model=ChatMessage)
-async def handle_chat_message(ctx: Context, sender: str, msg: ChatMessage):
+@protocol.on_message(model=ChatMessage)
+async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     """Handle incoming chat messages and store them in bonfire"""
     ctx.logger.info(f"Received message: {msg.message}")
-    
-    try:
-        # Store the message in bonfire
-        ingest_data = {
-            "content": msg.message,
-            "bonfire_id": msg.bonfire_id,
-            "title": "Chat Message",
-            "metadata": {
-                "source": "uagent",
-                "sender": sender,
-                "timestamp": ctx.storage.get("timestamp", "unknown")
-            }
-        }
-        
-        response = requests.post(
-            f"{BONFIRES_API_BASE}/ingest_content",
-            json=ingest_data,
-            headers={"Content-Type": "application/json"}
-        )
-        
-        if response.status_code == 200:
-            ctx.logger.info(f"Message stored in bonfire {msg.bonfire_id}")
-            
-            # Trigger taxonomy generation if this is a new bonfire
-            if msg.bonfire_id != "default":
-                taxonomy_response = requests.post(
-                    f"{BONFIRES_API_BASE}/trigger_taxonomy",
-                    json={"bonfire_id": msg.bonfire_id}
-                )
-                if taxonomy_response.status_code == 200:
-                    ctx.logger.info(f"Taxonomy generation triggered for {msg.bonfire_id}")
-            
-            # Send confirmation back
-            await ctx.send(sender, f"Message processed and stored in bonfire {msg.bonfire_id}")
-        else:
-            ctx.logger.error(f"Failed to store message: {response.status_code}")
-            await ctx.send(sender, f"Error storing message: {response.status_code}")
-            
-    except Exception as e:
-        ctx.logger.error(f"Error processing message: {e}")
-        await ctx.send(sender, f"Error processing message: {str(e)}")
+    await ctx.send(
+        sender,
+        ChatAcknowledgement(timestamp=datetime.now(), acknowledged_msg_id=msg.msg_id),
+    ) 
 
-@agent.on_message(model=SearchRequest)
-async def handle_search_request(ctx: Context, sender: str, msg: SearchRequest):
-    """Handle search requests against bonfire content"""
-    ctx.logger.info(f"Search request: {msg.query}")
-    
+       # collect up all the text chunks
+    text = ''
+    for item in msg.content:
+        if isinstance(item, TextContent):
+            text += item.text 
     try:
         # Search in vector store
         search_data = {
-            "bonfire_id": msg.bonfire_id,
-            "additional_query": msg.query
+            "bonfire_id": BONFIRES_ID,
+            "additional_query": text
         }
         
         response = requests.post(
@@ -117,19 +97,80 @@ async def handle_search_request(ctx: Context, sender: str, msg: SearchRequest):
             results = response.json()
             ctx.logger.info(f"Search completed, found {len(results) if isinstance(results, list) else 'results'}")
             
-            # Send results back
-            search_response = SearchResponse(
-                results=results,
-                query=msg.query
-            )
-            await ctx.send(sender, search_response)
+            search_response = results
         else:
             ctx.logger.error(f"Search failed: {response.status_code}")
-            await ctx.send(sender, f"Search failed: {response.status_code}")
-            
+            search_response="No results found"
     except Exception as e:
         ctx.logger.error(f"Error performing search: {e}")
-        await ctx.send(sender, f"Error performing search: {str(e)}")
+       
+        # query the model based on the user question
+    chat_response = 'I am afraid something went wrong and I am unable to answer your question at the moment'
+    try:
+        r = client.chat.completions.create(
+            model="asi1-mini",
+            messages=[
+                {"role": "system", "content": f"""
+        You are a helpful assistant who only answers questions about {subject_matter}. 
+        You should use the search results to answer the user's question.
+                """},
+                {"role": "assistant", "content": search_response},
+                {"role": "user", "content": text},
+            ],
+            max_tokens=2048,
+        )
+ 
+        chat_response = str(r.choices[0].message.content)
+          # send the response back to the user
+        await ctx.send(sender, ChatMessage(
+            timestamp=datetime.utcnow(),
+            msg_id=uuid4(),
+            content=[
+                # we send the contents back in the chat message
+                TextContent(type="text", text=chat_response),
+                # we also signal that the session is over, this also informs the user that we are not recording any of the
+                # previous history of messages.
+                EndSessionContent(type="end-session"),
+            ]
+        ))
+ 
+    except Exception as e:
+        ctx.logger.exception('Error querying model')
+
+    try:
+        # Store the message in bonfire using the new vector_store/add_chunk endpoint
+        add_chunk_data = {
+            "content": f"{text}\n\n{chat_response}",
+            "bonfire_id": BONFIRES_ID,
+            "label": "Chat Message"
+        }
+        
+        response = requests.post(
+            f"{BONFIRES_API_BASE}/vector_store/add_chunk",
+            json=add_chunk_data,
+            headers={"Content-Type": "application/json"}
+        )
+        
+        if response.status_code == 200 and response.json().get("success"):
+            ctx.logger.info(f"Message stored in vector store for bonfire {BONFIRES_ID}")
+            await ctx.send(sender, f"Message processed and stored in vector store for bonfire {BONFIRES_ID}")
+        else:
+            error_msg = response.json().get("message") if response.headers.get("Content-Type", "").startswith("application/json") else response.text
+            ctx.logger.error(f"Failed to store message: {response.status_code} {error_msg}")
+            await ctx.send(sender, f"Error storing message: {response.status_code} {error_msg}")
+            
+    except Exception as e:
+        ctx.logger.error(f"Error processing message: {e}")
+        await ctx.send(sender, f"Error processing message: {str(e)}")
+
+@protocol.on_message(ChatAcknowledgement)
+async def handle_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
+    # we are not interested in the acknowledgements for this example, but they can be useful to
+    # implement read receipts, for example.
+    pass
+
+
+agent.include(protocol, publish_manifest=True)
 
 if __name__ == "__main__":
     print(f"Starting bonfire agent: {agent.name}")

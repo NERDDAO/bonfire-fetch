@@ -1,4 +1,5 @@
 uagents
 uagents-core
 openai
-pydantic 
+pydantic
+mnemonic 
